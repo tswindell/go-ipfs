@@ -9,6 +9,12 @@ import (
 	cid "gx/ipfs/QmcTcsTvfaeEBRFo1TkFgT8sRmgi1n1LTZpecfVP8fzpGD/go-cid"
 )
 
+type Path interface {
+	String() string
+	Resolved() bool
+	Cid() *cid.Cid
+}
+
 type Link ipld.Link
 
 type Reader interface {
@@ -18,12 +24,15 @@ type Reader interface {
 
 type CoreAPI interface {
 	Unixfs() UnixfsAPI
+	ResolvePath(context.Context, Path) (Path, error)
+	ResolveNode(context.Context, Path) (ipld.Node, error)
 }
 
 type UnixfsAPI interface {
-	Add(context.Context, io.Reader) (*cid.Cid, error)
-	Cat(context.Context, string) (Reader, error)
-	Ls(context.Context, string) ([]*Link, error)
+	Core() CoreAPI
+	Add(context.Context, io.Reader) (Path, error)
+	Cat(context.Context, Path) (Reader, error)
+	Ls(context.Context, Path) ([]*Link, error)
 }
 
 // type ObjectAPI interface {
