@@ -387,6 +387,23 @@ var dialCmd = &cmds.Command{
 
 			go doAccept(&app, remote, listener)
 
+		case "udp", "udp4", "udp6":
+			pc, err := manet.ListenPacket(bindAddr)
+			if err != nil {
+				res.SetError(err, cmds.ErrNormal)
+				if err := remote.Close(); err != nil {
+					res.SetError(err, cmds.ErrNormal)
+				}
+				return
+			}
+
+			app.address = pc.Multiaddr()
+			app.closer = pc
+			app.running = true
+
+			go startPacketForwarding(&app, remote, pc)
+
+
 		default:
 			res.SetError(errors.New("Unsupported protocol: "+lnet), cmds.ErrNormal)
 			return
@@ -424,6 +441,26 @@ func doAccept(app *cnAppInfo, remote net.Stream, listener manet.Listener) {
 
 	streams.Register(&stream)
 	startStreaming(&stream)
+}
+
+func startPacketForwarding(app *cnAppInfo, remote io.ReadWriteCloser, pc manet.PacketConn) {
+	for app.running {
+		buffer := make([]byte, 4096)
+
+		_, _, err := pc.Connection().ReadFrom(buffer)
+		if err != nil {
+			pc.Connection().Close()
+			remote.Close()
+			return
+		}
+
+		_, err = remote.Write(buffer)
+		if err != nil {
+			pc.Connection().Close()
+			remote.Close()
+			return
+		}
+	}
 }
 
 var closeCmd = &cmds.Command{
